@@ -3,6 +3,7 @@
   stdenv,
   stdenvNoCC,
   fetchurl,
+  lttng-ust,
   autoPatchelfHook,
   makeWrapper,
   unzip,
@@ -11,8 +12,8 @@
   zlib,
   libkrb5,
   curl,
+  hostRid ? null
 }:
-{ hostRid ? null }:
 let
   runtimeBuildInputs = [
     stdenv.cc.cc.lib
@@ -44,7 +45,8 @@ in
       stdenv.mkDerivation {
         name = name_;
         inherit src;
-        nativeBuildInputs = [ autoPatchelfHook ];
+        sourceRoot = ".";
+        nativeBuildInputs = [ autoPatchelfHook lttng-ust ];
         buildInputs = runtimeBuildInputs;
         dontConfigure = true;
         dontBuild = true;

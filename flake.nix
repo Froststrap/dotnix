@@ -31,11 +31,7 @@
           pkgs = nixpkgs.legacyPackages.${system};
           hostRid = hostRidFor system;
 
-          mk = import ./lib/mk-dotnet.nix {
-            inherit (pkgs)
-              lib stdenv stdenvNoCC fetchurl autoPatchelfHook makeWrapper
-              unzip icu openssl zlib libkrb5 curl;
-          } { inherit hostRid; };
+          mk = pkgs.callPackage ./lib/mk-dotnet.nix { inherit hostRid; };
 
           normalizeName = lib.replaceStrings [ "." ] [ "_" ];
 
