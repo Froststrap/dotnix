@@ -65,7 +65,7 @@ match stable with
   | None -> check false "host system recognized" "unsupported uname output"
   | Some sys ->
     let (ec, eo, eerr) =
-      sh (sprintf "nix eval --json .#packages.%s.toolchains --apply 'builtins.attrNames'" sys)
+      sh (sprintf "nix eval --json .#packages.%s --apply 'p: builtins.filter (n: builtins.match \"[0-9]+-[0-9]+\" n != null) (builtins.attrNames p)'" sys)
     check (ec = 0) (sprintf "flake evaluates for %s" sys) eerr
 
     if ec = 0 then
@@ -74,18 +74,18 @@ match stable with
         | Some chs -> chs
         | None -> []
 
-      check (not channels.IsEmpty) "toolchains are listed" eo
+      check (not channels.IsEmpty) "versions are listed" eo
 
       if not channels.IsEmpty then
         let major (ch: string) =
-          ch.Split('_') |> Array.head |> int
+          ch.Split('-') |> Array.head |> int
 
         let newest = channels |> List.maxBy major
         printfn "  -> testing toolchain %s (%s)" newest sys
 
         printfn "\n[build]"
         let (bc, _, berr) =
-          sh (sprintf "nix build -o result .#packages.%s.toolchains.%s" sys newest)
+          sh (sprintf "nix build -o result .#packages.%s.%s.stable.default" sys newest)
         check (bc = 0) (sprintf "toolchain %s builds" newest) berr
 
         if bc = 0 then
@@ -105,7 +105,24 @@ match stable with
           check (lc = 0) "dotnet --list-sdks runs" lOut
           check (lOut.Contains vOut) "--list-sdks shows the SDK" lOut
 
-          let dataChannel = newest.Replace('_', '.')
+          let (hc, _, _) = sh "test -f result/nix-support/setup-hook"
+          check (hc = 0) "result/nix-support/setup-hook exists" ""
+
+          let (hh, _, _) = sh "grep -q DOTNET_NOLOGO result/nix-support/setup-hook"
+          check (hh = 0) "setup hook makes HOME writable" ""
+
+          let (nh, _, _) = sh "grep -q configureNuget result/nix-support/setup-hook"
+          check (nh = 0) "setup hook configures NuGet" ""
+
+          let compatExpr =
+            sprintf "nix eval --raw .#packages.%s.%s.stable.default --apply 'p: if p.packages == [] && p ? targetPackages && p ? meta.platforms && p.runtime.drvPath == p.drvPath then \"ok\" else \"missing\"'" sys newest
+          let (cc, ccOut, ccErr) = sh compatExpr
+          check
+            (cc = 0 && ccOut.Trim() = "ok")
+            "exposes buildDotnetModule compatibility attributes"
+            ccErr
+
+          let dataChannel = newest.Replace('-', '.')
           match stable[dataChannel] with
           | null -> ()
           | channel ->
