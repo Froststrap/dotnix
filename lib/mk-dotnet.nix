@@ -3,7 +3,7 @@
   stdenv,
   stdenvNoCC,
   fetchurl,
-  lttng-ust,
+  lttng-ust_2_12,
   autoPatchelfHook,
   makeWrapper,
   unzip,
@@ -22,9 +22,12 @@ let
     zlib
     libkrb5
     curl
+    lttng-ust_2_12
   ];
 
   isZip = url: lib.hasSuffix ".zip" (baseNameOf url);
+  isLinuxNative = rid:
+    hostRid == rid && lib.hasPrefix "linux-" rid && !lib.hasInfix "musl" rid;
 in
 {
   mkArtifact =
@@ -35,18 +38,16 @@ in
     , name ? null
     }:
     let
-      name_ = if name != null then
-        name
-      else "dotnet-${component}-${rid}";
+      name' = if name != null then name else "dotnet-${component}-${rid}";
       src = fetchurl { inherit url; sha512 = hash; };
     in
-    if hostRid == rid && lib.hasPrefix "linux-" rid && !lib.hasInfix "musl" rid
+    if isLinuxNative rid
     then
       stdenv.mkDerivation {
-        name = name_;
+        name = name';
         inherit src;
         sourceRoot = ".";
-        nativeBuildInputs = [ autoPatchelfHook lttng-ust ];
+        nativeBuildInputs = [ autoPatchelfHook ];
         buildInputs = runtimeBuildInputs;
         dontConfigure = true;
         dontBuild = true;
@@ -54,11 +55,40 @@ in
           mkdir -p $out/share/dotnet
           cp -a . $out/share/dotnet/
         '';
+
+        postFixup = lib.optionalString (isLinuxNative rid) ''
+          addNeeded() {
+            local libs="$1"; shift
+            local f l
+            for f in "$@"; do
+              [ -e "$f" ] || continue
+              for l in $libs; do
+                patchelf --add-needed "$l" "$f"
+              done
+            done
+          }
+
+          nativeHosts=($out/share/dotnet/packs/Microsoft.NETCore.App.Host.${rid}/*/runtimes/${rid}/native/*host)
+          aotLibs=($out/share/dotnet/sdk/*/libdotnet-aot.so)
+
+          addNeeded "libicui18n.so libicuuc.so" \
+            $out/share/dotnet/shared/Microsoft.NETCore.App/*/libcoreclr.so \
+            $out/share/dotnet/shared/Microsoft.NETCore.App/*/*System.Globalization.Native.so \
+            "''${nativeHosts[@]}" "''${aotLibs[@]}"
+
+          addNeeded "libgssapi_krb5.so" \
+            $out/share/dotnet/shared/Microsoft.NETCore.App/*/*System.Net.Security.Native.so \
+            "''${nativeHosts[@]}" "''${aotLibs[@]}"
+
+          addNeeded "libssl.so" \
+            $out/share/dotnet/shared/Microsoft.NETCore.App/*/*System.Security.Cryptography.Native.OpenSsl.so \
+            "''${nativeHosts[@]}" "''${aotLibs[@]}"
+        '';
         passthru = { inherit rid url hash; };
       }
     else
       stdenvNoCC.mkDerivation {
-        name = name_;
+        name = name';
         inherit src;
         sourceRoot = ".";
         nativeBuildInputs = lib.optionals (isZip url) [ unzip ];
