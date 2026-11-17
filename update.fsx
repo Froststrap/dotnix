@@ -3,6 +3,7 @@
 open System
 open System.IO
 open System.Net.Http
+open System.Security.Cryptography
 open System.Text.Json
 open System.Text.Json.Nodes
 
@@ -203,6 +204,54 @@ let fetchDaily (channels: string list) =
 
   out
 
+let roslynToolId = "roslyn-language-server"
+
+let roslynRidTargets = [
+  "linux-x64"
+  "linux-arm64"
+  "linux-musl-x64"
+  "linux-musl-arm64"
+  "osx-x64"
+  "osx-arm64"
+  "win-x64"
+  "win-arm64"
+]
+
+// NuGet exposes no package hashes, so the RID tool packages are downloaded and
+// hashed here. This is the only place dotnix needs to download an artifact to
+// record it.
+let fetchRoslynLanguageServer () =
+  let indexUrl = sprintf "https://api.nuget.org/v3-flatcontainer/%s/index.json" roslynToolId
+  let index = fetchJson indexUrl
+  let versions =
+    index["versions"].AsArray()
+    |> Seq.map (fun v -> v.GetValue<string>())
+    |> Seq.toList
+
+  if versions.IsEmpty then
+    failwithf "no versions published for %s" roslynToolId
+
+  // The feed lists versions oldest -> newest and every upstream release is a
+  // prerelease, so the last entry is the newest.
+  let version = List.last versions
+  let out = JsonObject()
+  out["version"] <- version
+  let files = JsonObject()
+
+  use downloader = new HttpClient(Timeout = TimeSpan.FromMinutes 10.)
+
+  for rid in roslynRidTargets do
+    let pkgId = sprintf "%s.%s" roslynToolId rid
+    let url =
+      sprintf "https://api.nuget.org/v3-flatcontainer/%s/%s/%s.%s.nupkg" pkgId version pkgId version
+    printfn "  hashing %s@%s ..." pkgId version
+    let bytes = downloader.GetByteArrayAsync(url).GetAwaiter().GetResult()
+    let hash = SHA256.HashData bytes |> Convert.ToBase64String
+    files[rid] <- "sha256-" + hash
+
+  out["files"] <- files
+  out
+
 let writeJson (name: string) (node: JsonNode) =
   let opts = JsonSerializerOptions(WriteIndented = true)
   File.WriteAllText(sprintf "data/%s.json" name, node.ToJsonString(opts) + "\n")
@@ -218,3 +267,8 @@ printfn "Fetching latest builds + sha512 sidecars…"
 let daily = fetchDaily [ for e in stable -> e.Key ]
 writeJson "daily" daily
 printfn "  wrote data/daily.json (%d channels)" daily.Count
+
+printfn "Fetching roslyn-language-server..."
+let roslyn = fetchRoslynLanguageServer ()
+writeJson "roslyn-language-server" roslyn
+printfn "  wrote data/roslyn-language-server.json (%s)" (roslyn["version"].GetValue<string>())

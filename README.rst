@@ -95,6 +95,20 @@ Every source also exposes its components keyed by upstream RID:
 
 Also available: ``mkArtifact`` for raw per-RID artifacts.
 
+Language server
+---------------
+
+``roslyn-language-server`` (the Roslyn-based C# language server, the successor
+to OmniSharp) is provided for the host RID. It is framework-dependent and runs
+on the toolchain runtime, so it does not pull in a second .NET SDK:
+
+.. code-block:: nix
+
+   dotnix.packages.<system>.roslyn-language-server
+
+Its version and per-RID hashes live in ``data/roslyn-language-server.json`` and
+are refreshed by ``update.fsx``.
+
 
 Support
 ========

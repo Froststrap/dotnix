@@ -45,6 +45,10 @@ match (try Some(JsonNode.Parse(File.ReadAllText "data/daily.json")) with _ -> No
 | Some _ -> check true "data/daily.json exists and parses" ""
 | None -> check false "data/daily.json exists and parses" "missing or invalid JSON"
 
+match (try Some(JsonNode.Parse(File.ReadAllText "data/roslyn-language-server.json")) with _ -> None) with
+| Some _ -> check true "data/roslyn-language-server.json exists and parses" ""
+| None -> check false "data/roslyn-language-server.json exists and parses" "missing or invalid JSON"
+
 printfn "\n[nix]"
 
 let (nvCode, nvOut, _) = sh "nix --version"
@@ -134,6 +138,18 @@ match stable with
               (vOut = expected)
               (sprintf "built version matches stable latest-sdk (%s)" expected)
               (sprintf "got %s" vOut)
+
+        printfn "\n[roslyn-language-server]"
+        let (rc, rout, _) =
+          sh (sprintf "nix build --no-link --print-out-paths .#packages.%s.roslyn-language-server" sys)
+        check (rc = 0) "roslyn-language-server builds" ""
+        if rc = 0 then
+          let lspRoot = rout.Trim()
+          let (lr, lout, lerr) = sh (sprintf "%s/bin/roslyn-language-server" lspRoot)
+          check
+            (lr = 0 && (lout + lerr).Contains "stdio")
+            "roslyn-language-server runs and asks for --stdio/--pipe"
+            (lout + lerr)
 
 printfn "\n%d passed, %d failed" passed failed
 exit (if failed = 0 then 0 else 1)

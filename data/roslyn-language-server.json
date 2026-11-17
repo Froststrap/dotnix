@@ -1,0 +1,13 @@
+{
+  "version": "5.13.0-1.26514.10",
+  "files": {
+    "linux-x64": "sha256-+PiAp2OvAgguoHvXCSPqzmG8LF0D7XYvpbLblYd8zxQ=",
+    "linux-arm64": "sha256-c1jKp7e/Z46bb5Uq/qqV1PXomZJrme34KFL1ezgtOho=",
+    "linux-musl-x64": "sha256-r1cq9df315BVkLVPL4+jIqFg8Czj6hcAnTofZ72VtD0=",
+    "linux-musl-arm64": "sha256-G0M6UJGQxgH4OLKNp6vKcYN9JejDR4Ly2bxOMSSfWps=",
+    "osx-x64": "sha256-MGIzSs/8ac3u2mBkVeSKH25BcUxfk6126Svm89Zcy/8=",
+    "osx-arm64": "sha256-L5C6b4zIBGLY3BZukQ1AMB+RLq9SAs3tfehRGsXhMwQ=",
+    "win-x64": "sha256-hEItWD8NX2UkxHWGFwQmYt0w0/YAI4VGz+k3cF1x02Y=",
+    "win-arm64": "sha256-ypwF2GzfkoY8DEZ4yGzASnXAUiMEFXRAFg3ONVtX0wI="
+  }
+}
